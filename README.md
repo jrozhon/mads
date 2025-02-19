@@ -63,7 +63,7 @@ For Xpra, use the following mapping:
 
 If the server IP is `10.100.0.41`, the Xpra connection becomes:
 
-xpra attach ssh:user@158.196.244.134 -p 41100
+`xpra attach ssh:user@158.196.244.134 -p 41100`
 
 ## 🛠️ Commands
 

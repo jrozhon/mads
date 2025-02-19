@@ -57,7 +57,7 @@ http://158.196.244.134:41443
 
 For Xpra, use the following mapping:
 
-158.196.244.134:<last-octet-of-server-ip>100
+`158.196.244.134:<last-octet-of-server-ip>100`
 
 ### Example:
 

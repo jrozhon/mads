@@ -1,6 +1,6 @@
 # 🎓 Welcome!
 
-In this course we will be working with virtual servers based on Ubuntu 24.04. On these servers, we will run Jupyter Lab to enable easy access to servers' resources using the web interface you should already be familiarized with.  Inside Jupyter, we will run our NS-3 simulations. 
+In this course we will be working with virtual servers based on Ubuntu 24.04. On these servers, we will run Jupyter Lab to enable easy access to servers' resources using the web interface you should already be familiarized with. Inside Jupyter, we will run our NS-3 simulations.
 
 There are currently 13 virtual servers with private addresses in range **10.100.0.41-53/23**. These are accessible via our gateway that has a VSB-connected address **158.196.244.134**.
 
@@ -30,9 +30,15 @@ ssh student@158.196.244.134 -p 4122
 
 To run Jupyter Lab on the server, follow these steps:
 
-1. ssh student@158.196.244.134 -p <last-octet-of-server-ip>22
+1. Connect to remote server via ssh (see above) and make sure you are in student's home directory.
 2. source venv-ns3-2025/bin/activate
 3. jupyter lab --ip 0.0.0.0 --port 8443
+
+If Jupyter is not installed in your virtual environment, you can easily install it using:
+
+```
+pip install jupyterlab
+```
 
 ---
 
@@ -45,6 +51,7 @@ http://158.196.244.134:<last-octet-of-server-ip>443
 ```
 
 ### Example:
+
 If the server IP is `10.100.0.41`, the URL becomes:
 
 ```
@@ -72,6 +79,8 @@ Here, you can find the commands to set up and connect to the services. This sect
 ---
 
 ### 🤔 Need Help?
+
 If you encounter any issues or have questions, feel free to reach out to your instructor or system administrator.
 
 Happy Learning! 🚀
+

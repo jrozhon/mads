@@ -357,7 +357,7 @@ def get_routing_table_str(node: Union[ns.Node, ns.Ptr]) -> str:
     tmpfname = ".routing"
     ipproto = node.GetObject[ns.Ipv4]().__deref__()
     routing_proto = ipproto.GetRoutingProtocol().__deref__()
-    routing_stream = ns.network.OutputStreamWrapper(tmpfname, 0)
+    routing_stream = ns.OutputStreamWrapper(tmpfname, 0)
     routing_proto.PrintRoutingTable(routing_stream)
 
     with open(tmpfname, "r") as f:

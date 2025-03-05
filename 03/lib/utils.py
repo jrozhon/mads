@@ -63,7 +63,7 @@ def get_node_ips(node: Union[ns.Node, ns.Ptr], verbose: bool = False) -> dict[in
         pass
     addrs: dict[int,list] = {}
     addrs_verbose: dict[int,list] = {}
-    ipv4 = node.GetObject[ns.internet.Ipv4]()
+    ipv4 = node.GetObject[ns.Ipv4]()
     for i in range(ipv4.GetNInterfaces()):
         for j in range(ipv4.GetNAddresses(i)):
             if i not in addrs.keys():
@@ -76,7 +76,7 @@ def get_node_ips(node: Union[ns.Node, ns.Ptr], verbose: bool = False) -> dict[in
         print(json.dumps(addrs_verbose, indent=2))
     return addrs
 
-def get_ip_of_remote_server(echo_client: Union[ns.applications.UdpEchoClient, ns.Ptr]) -> ns.network.Ipv4Address:
+def get_ip_of_remote_server(echo_client: Union[ns.UdpEchoClient, ns.Ptr]) -> ns.Ipv4Address:
     """
     Get IP address of a remote server.
 
@@ -103,7 +103,6 @@ def get_ip_of_remote_server(echo_client: Union[ns.applications.UdpEchoClient, ns
 
 ##########################################################################
 # 02
-
 """
 def generate_positions():
     positions = ns.CreateObject("ListPositionAllocator")
@@ -162,7 +161,129 @@ def get_node_ip_from_idx(
 
 
 ##########################################################################
+def get_address_table_from_iface_container(
+    ifaces: ns.Ipv4InterfaceContainer,
+    display: bool = True,
+) -> dict:
+    """
+    Extract address information from an IPv4 interface container and create a table of addresses.
 
+    Parameters
+    ----------
+    ifaces : ns.Ipv4InterfaceContainer
+        Container of IPv4 interfaces from which to extract address information.
+    display : bool, optional
+        If True, prints the address table in JSON format. Default is True.
+
+    Returns
+    -------
+    list[dict]
+        A list of dictionaries containing address information for each interface.
+        Each dictionary contains:
+            - 'iface': Interface index
+            - 'address_stack': Address stack index
+            - 'address': IPv4 address string
+            - 'broadcast': Broadcast address string
+            - 'netmask': Network mask string
+
+    Notes
+    -----
+    This function iterates through all interfaces in the container and their
+    associated addresses to create a comprehensive table of network addressing
+    information.
+
+    Examples
+    --------
+    >>> ifaces = ns.Ipv4InterfaceContainer()
+    >>> address_table = get_address_table_from_iface_container(ifaces)
+    >>> address_table = get_address_table_from_iface_container(ifaces, display=False)
+    """
+    address_table = []
+    n_ifaces = ifaces.GetN()
+
+    for i in range(n_ifaces):
+        iface_ptr, iface_idx = ifaces.Get(i)
+        ipv4l3 = iface_ptr.__deref__()
+        n_addresses = ipv4l3.GetNAddresses(iface_idx)
+
+        for j in range(n_addresses):
+            address_stack = ipv4l3.GetAddress(iface_idx, j)
+            address_table.append(
+                {
+                    "iface": i,
+                    "address_stack": j,
+                    "address": str(address_stack.GetAddress()),
+                    "broadcast": str(address_stack.GetBroadcast()),
+                    "netmask": str(address_stack.GetMask()),
+                }
+            )
+
+    if display:
+        print(json.dumps(address_table, indent=2))
+
+    return address_table
+
+def get_device_mac_address(device: Union[ns.NetDevice, ns.Ptr]) -> ns.Mac48Address:
+    """
+    Get the MAC address of a network device.
+
+    Parameters
+    ----------
+    device : ns.Device
+        The network device object from which to extract the MAC address.
+
+    Returns
+    -------
+    ns.Mac48Address
+        The MAC address of the device in ns3 Mac48Address format.
+
+    Notes
+    -----
+    This function converts the generic address obtained from the device
+    to a specific Mac48Address format used in ns-3.
+    """
+
+    # Ensure that device is a NetDevice
+    try:
+        device = device.__deref__()
+    except AttributeError as e:
+        # device is already a NetDevice
+        pass
+
+    address = device.GetAddress()
+    return ns.Mac48Address.ConvertFrom(address)
+
+def get_nodeid_in_nodelist(device: Union[ns.NetDevice, ns.Ptr]) -> int:
+    """
+    Get the node ID from a device object.
+
+    Parameters
+    ----------
+    device : ns.Device
+        The network device object from which to extract the node ID.
+
+    Returns
+    -------
+    int
+        The unique identifier (ID) of the node associated with the device.
+
+    Notes
+    -----
+    This function first gets the node pointer from the device,
+    dereferences it to get the actual node object, and then
+    retrieves its ID.
+    """
+
+    # Ensure that device is a NetDevice
+    try:
+        device = device.__deref__()
+    except AttributeError as e:
+        # device is already a NetDevice
+        pass
+
+    node_pointer = device.GetNode()
+    node = node_pointer.__deref__()
+    return node.GetId()
 
 def get_iface_from_ifacecontainer(
     container: ns.Ipv4InterfaceContainer, if_idx: int
@@ -219,7 +340,7 @@ def assign_ip_to_iface(
     # Get the node
     node = device.GetNode().__deref__()
     # Get Ipv4 object for node
-    ip = node.GetObject[ns.internet.Ipv4]().__deref__()
+    ip = node.GetObject[ns.Ipv4]().__deref__()
     # Check if there is an interface with ip stack on device
     if_index = ip.GetInterfaceForDevice(device)
     if if_index == -1:
@@ -228,12 +349,71 @@ def assign_ip_to_iface(
     # Assign ip address
     status = ip.AddAddress(
         if_index,
-        ns.internet.Ipv4InterfaceAddress(
-            ns.network.Ipv4Address(addr), ns.network.Ipv4Mask(netmask)
+        ns.Ipv4InterfaceAddress(
+            ns.Ipv4Address(addr), ns.Ipv4Mask(netmask)
         ),
     )
 
     return status
+
+def assign_ip_to_device(
+    device: Union[ns.NetDevice, ns.Ptr],
+    addr: str,
+    netmask: Union[str, int],
+) -> bool:
+    """
+    Assign an IPv4 address and netmask to a network device.
+
+    Parameters
+    ----------
+    device : Union[ns.NetDevice, ns.Ptr]
+        The network device or a pointer to the network device to which
+        the IP address will be assigned.
+    addr : str
+        The IPv4 address to assign to the device in string format
+        (e.g., '192.168.1.1').
+    netmask : Union[str, int]
+        The network mask either as a string (e.g., '255.255.255.0')
+        or as an integer representing the prefix length (e.g., 24).
+
+    Returns
+    -------
+    bool
+        True if the IP address was successfully assigned to the device,
+        False otherwise.
+
+    Notes
+    -----
+    This function handles both direct NetDevice objects and pointers to
+    NetDevice objects. If a pointer is provided, it will be dereferenced
+    automatically. The function creates an IPv4 interface, adds the specified
+    address with netmask, and attaches it to the device.
+
+    Examples
+    --------
+    >>> assign_ip_to_device(device, "192.168.1.1", "255.255.255.0")
+    True
+    >>> assign_ip_to_device(device, "10.0.0.1", 24)
+    True
+    """
+    # Ensure that device is a NetDevice
+    try:
+        device = device.__deref__()
+    except AttributeError:
+        # device is already a NetDevice
+        pass
+
+    iface = ns.Ipv4Interface()
+    iface.AddAddress(
+        ns.Ipv4InterfaceAddress(
+            ns.Ipv4Address(addr),
+            ns.Ipv4Mask(netmask),
+        )
+    )
+    status = iface.SetDevice(device)
+
+    return status
+
 
 
 def get_ipproto_on_node(node: Union[ns.Node, ns.Ptr]) -> ns.Ipv4L3Protocol:
@@ -256,22 +436,22 @@ def get_ipproto_on_node(node: Union[ns.Node, ns.Ptr]) -> ns.Ipv4L3Protocol:
     except AttributeError as e:
         pass
 
-    return node.GetObject[ns.internet.Ipv4]().__deref__()
+    return node.GetObject[ns.Ipv4]().__deref__()
 
 
 def create_echo_client_helper(
-    server_address: ns.Address,
+    server_address: str,
     server_port: int,
     max_packets: int = 50,
     interval: float = 1.0,
     packet_size: int = 1500,
-) -> ns.applications.UdpEchoClientHelper:
+) -> ns.UdpEchoClientHelper:
     """
     Creates a UdpEchoClientHelper object.
 
     Parameters
     ----------
-    server_address : ns.Address
+    server_address : str
         The server address for the UdpEchoClientHelper.
     server_port : int
         The server port for the UdpEchoClientHelper.
@@ -284,13 +464,20 @@ def create_echo_client_helper(
 
     Returns
     -------
-    ns.applications.UdpEchoClientHelper
+    ns.UdpEchoClientHelper
         The created UdpEchoClientHelper object.
     """
-    echo_client = ns.applications.UdpEchoClientHelper(server_address, server_port)
-    echo_client.SetAttribute("MaxPackets", ns.core.UintegerValue(max_packets))
-    echo_client.SetAttribute("Interval", ns.core.TimeValue(ns.core.Seconds(interval)))
-    echo_client.SetAttribute("PacketSize", ns.core.UintegerValue(packet_size))
+
+    remote = ns.Address(
+        ns.InetSocketAddress(
+            ns.Ipv4Address(server_address),
+            server_port
+        ).ConvertTo()
+    )
+    echo_client = ns.UdpEchoClientHelper(remote)
+    echo_client.SetAttribute("MaxPackets", ns.UintegerValue(max_packets))
+    echo_client.SetAttribute("Interval", ns.TimeValue(ns.Seconds(interval)))
+    echo_client.SetAttribute("PacketSize", ns.UintegerValue(packet_size))
     return echo_client
 
 
@@ -319,7 +506,7 @@ def get_routing_table_str(node: Union[ns.Node, ns.Ptr]) -> str:
     tmpfname = ".routing"
     ipproto = node.GetObject[ns.Ipv4]().__deref__()
     routing_proto = ipproto.GetRoutingProtocol().__deref__()
-    routing_stream = ns.network.OutputStreamWrapper(tmpfname, 0)
+    routing_stream = ns.OutputStreamWrapper(tmpfname, 0)
     routing_proto.PrintRoutingTable(routing_stream)
 
     with open(tmpfname, "r") as f:
